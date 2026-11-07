@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orbit — AI Trading</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1020;
+      --panel: #131b2e;
+      --muted: #93a0b8;
+      --text: #edf2ff;
+      --accent: #7c6cff;
+      --green: #35d39a;
+      --border: #26324b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.5 system-ui, sans-serif;
+    }
+    header, main { max-width: 1100px; margin: auto; padding: 24px; }
+    header { display: flex; justify-content: space-between; align-items: center; }
+    .brand { font-size: 21px; font-weight: 750; }
+    .brand span { color: var(--accent); }
+    .badge { color: #ffd17a; font-size: 12px; }
+    h1 { font-size: clamp(30px, 5vw, 48px); margin: 32px 0 8px; }
+    p, .muted { color: var(--muted); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+    .panel, .coin { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
+    .section-title { margin: 34px 0 14px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .coin-name { font-weight: 700; }
+    .symbol { color: var(--muted); font-size: 13px; }
+    .change { color: var(--green); }
+    button {
+      border: 0; border-radius: 10px; padding: 10px 14px;
+      color: white; background: var(--accent); font-weight: 650; cursor: pointer;
+    }
+    button:hover { filter: brightness(1.12); }
+    .agent-status { color: var(--green); font-size: 13px; }
+    .notice { margin-top: 24px; padding: 14px; border-radius: 12px; background: #211d16; color: #f0cd8d; }
+    dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 16px; padding: 24px; width: min(420px, calc(100% - 32px)); }
+    dialog::backdrop { background: #000a; }
+    input { width: 100%; padding: 12px; margin: 12px 0; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">orbit<span>.</span></div>
+    <div class="badge">DEMO · No real trades</div>
+  </header>
+
+  <main>
+    <p class="muted">AI-assisted crypto dashboard</p>
+    <h1>Trade with a clearer view.</h1>
+    <p>Monitor sample markets, explore trading agents, and test the buy flow in a demo environment.</p>
+
+    <h2 class="section-title">Your AI agents</h2>
+    <section class="grid" id="agents"></section>
+
+    <h2 class="section-title">Markets</h2>
+    <section class="grid" id="markets"></section>
+
+    <div class="notice">
+      This prototype uses sample prices and simulated purchases. It does not provide investment advice or connect to a wallet or exchange.
+    </div>
+  </main>
+
+  <dialog id="buyDialog">
+    <form method="dialog">
+      <h2 id="buyTitle">Buy coin</h2>
+      <p class="muted">Demo only — no funds will be used.</p>
+      <label for="amount">Amount in USD</label>
+      <input id="amount" type="number" min="1" placeholder="100" required>
+      <div class="row">
+        <button value="cancel" style="background:#303b52">Cancel</button>
+        <button id="confirmBuy" value="default">Simulate buy</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    const agentData = [
+      { name: "Trend Scout", strategy: "Tracks momentum signals", status: "Ready" },
+      { name: "Risk Monitor", strategy: "Flags volatility and exposure", status: "Monitoring" },
+      { name: "DCA Planner", strategy: "Plans recurring sample purchases", status: "Ready" }
+    ];
+
+    const coinData = [
+      { name: "Bitcoin", symbol: "BTC", price: "$67,420.00", change: "+2.4%" },
+      { name: "Ethereum", symbol: "ETH", price: "$3,520.00", change: "+1.8%" },
+      { name: "Solana", symbol: "SOL", price: "$148.20", change: "+4.1%" }
+    ];
+
+    document.querySelector("#agents").innerHTML = agentData.map(agent => `
+      <article class="panel">
+        <div class="row"><strong>${agent.name}</strong><span class="agent-status">● ${agent.status}</span></div>
+        <p>${agent.strategy}</p>
+        <button onclick="alert('Demo: agent settings would open here.')">Configure agent</button>
+      </article>
+    `).join("");
+
+    document.querySelector("#markets").innerHTML = coinData.map(coin => `
+      <article class="coin">
+        <div class="row">
+          <div><div class="coin-name">${coin.name}</div><div class="symbol">${coin.symbol}</div></div>
+          <span class="change">${coin.change}</span>
+        </div>
+        <div class="row" style="margin-top:18px">
+          <strong>${coin.price}</strong>
+          <button onclick="openBuy('${coin.symbol}')">Buy</button>
+        </div>
+      </article>
+    `).join("");
+
+    const dialog = document.querySelector("#buyDialog");
+    let selectedCoin = "";
+
+    function openBuy(symbol) {
+      selectedCoin = symbol;
+      document.querySelector("#buyTitle").textContent = `Buy ${symbol}`;
+      dialog.showModal();
+    }
+
+    document.querySelector("#confirmBuy").addEventListener("click", event => {
+      const amount = Number(document.querySelector("#amount").value);
+      if (!amount || amount < 1) return;
+      event.preventDefault();
+      dialog.close();
+      alert(`Demo purchase: $${amount} of ${selectedCoin}. No real trade was placed.`);
+      document.querySelector("#amount").value = "";
+    });
+  </script>
+</body>
+</html>
