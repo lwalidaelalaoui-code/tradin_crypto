@@ -1,217 +1,305 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Orbit — Paper Trading</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      --bg: #0b1020;
-      --panel: #131b2e;
-      --muted: #93a0b8;
-      --text: #edf2ff;
-      --accent: #7c6cff;
-      --green: #35d39a;
-      --border: #26324b;
-      --red: #ff8585;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font: 15px/1.5 system-ui, sans-serif;
-    }
-    header, main { max-width: 1100px; margin: auto; padding: 24px; }
-    header { display: flex; justify-content: space-between; align-items: center; }
-    .brand { font-size: 21px; font-weight: 750; }
-    .brand span { color: var(--accent); }
-    .badge { color: #ffd17a; font-size: 12px; }
-    h1 { font-size: clamp(30px, 5vw, 48px); margin: 30px 0 8px; }
-    p, .muted { color: var(--muted); }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
-    .panel, .coin { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
-    .section-title { margin: 32px 0 14px; }
-    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .symbol, .small { color: var(--muted); font-size: 13px; }
-    .price { font-size: 20px; font-weight: 700; margin-top: 18px; }
-    button {
-      border: 0; border-radius: 10px; padding: 10px 14px;
-      color: white; background: var(--accent); font-weight: 650; cursor: pointer;
-    }
-    button:disabled { opacity: .55; cursor: wait; }
-    button.secondary { background: #303b52; }
-    .status { min-height: 24px; margin: 12px 0; }
-    .error { color: var(--red); }
-    .success { color: var(--green); }
-    .notice { margin-top: 24px; padding: 14px; border-radius: 12px; background: #211d16; color: #f0cd8d; }
-    dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 16px; padding: 24px; width: min(420px, calc(100% - 32px)); }
-    dialog::backdrop { background: #000a; }
-    input { width: 100%; padding: 12px; margin: 8px 0 16px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; }
-    label { display: block; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NexusAI Trading Platform</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  body { background:#0B0E14; color:#E5E7EB; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .card { background:#111620; border:1px solid #1F2937; border-radius:14px; }
+  .gain { color:#00E676; } .loss { color:#FF5252; } .ai { color:#3B82F6; }
+  .scroll::-webkit-scrollbar{width:6px} .scroll::-webkit-scrollbar-thumb{background:#1F2937;border-radius:6px}
+  .tab-active{border-bottom:2px solid #3B82F6;color:#fff}
+</style>
 </head>
-<body>
-  <header>
-    <div class="brand">orbit<span>.</span></div>
-    <div class="badge">PAPER TRADING · No real funds</div>
-  </header>
+<body class="h-screen flex flex-col overflow-hidden">
 
-  <main>
-    <p class="muted">Live market quotes · Simulated orders</p>
-    <h1>Trading dashboard</h1>
-    <div class="row">
-      <span id="updated" class="small">Loading market data…</span>
-      <button id="refreshButton" class="secondary" onclick="loadPrices()">Refresh</button>
+<!-- HEADER -->
+<header class="flex items-center gap-4 px-4 h-14 border-b border-gray-800 bg-[#0B0E14]">
+  <div class="flex items-center gap-2 font-bold text-lg tracking-tight">
+    <i data-lucide="cpu" class="ai w-5 h-5"></i> NexusAI
+  </div>
+  <div class="relative flex-1 max-w-md">
+    <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-500"></i>
+    <input id="search" placeholder="Search ticker: BTC/USDT, AAPL, EUR/USD" class="w-full bg-[#111620] border border-gray-800 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[#3B82F6]">
+  </div>
+  <div class="flex items-center gap-2 text-xs"><span id="wsDot" class="w-2 h-2 rounded-full bg-[#00E676] animate-pulse"></span><span id="wsText" class="text-gray-400">WS Live</span></div>
+  <div class="ml-auto flex items-center gap-5">
+    <div class="card px-3 py-1.5 text-right">
+      <div class="text-[10px] text-gray-500">NET WORTH</div>
+      <div class="text-sm font-semibold" id="netWorth">$0.00</div>
     </div>
-    <div id="pageStatus" class="status" role="status"></div>
+    <button class="relative"><i data-lucide="bell" class="w-5 h-5 text-gray-400"></i><span class="absolute -top-1 -right-1 w-2 h-2 bg-[#FF5252] rounded-full"></span></button>
+    <div class="w-8 h-8 rounded-full bg-[#3B82F6]/20 border border-[#3B82F6] flex items-center justify-center text-xs font-bold">TR</div>
+  </div>
+</header>
 
-    <h2 class="section-title">AI agent proposals</h2>
-    <section class="grid">
-      <article class="panel">
-        <strong>Trend Scout</strong>
-        <p>Reviews recent market movement and suggests a direction for your consideration.</p>
-        <button onclick="showProposal('Trend Scout')">View sample proposal</button>
-      </article>
-      <article class="panel">
-        <strong>Risk Monitor</strong>
-        <p>Reminder to review order size and risk before placing a paper order.</p>
-        <button class="secondary" onclick="alert('Risk check: confirm the coin, order amount, and paper-trading mode.')">Review checklist</button>
-      </article>
-    </section>
+<main class="flex-1 grid grid-cols-12 gap-3 p-3 min-h-0">
 
-    <h2 class="section-title">Crypto markets</h2>
-    <section class="grid" id="markets"></section>
-
-    <div class="notice">
-      Orders are sent to your backend’s paper-trading endpoint. Quotes require a running backend.
-      Agent proposals are informational and do not automatically trade.
-    </div>
-  </main>
-
-  <dialog id="buyDialog">
-    <form id="buyForm">
-      <h2 id="buyTitle">Paper buy</h2>
-      <p class="muted">This submits a simulated order, not a real-money trade.</p>
-      <label for="amount">Amount in USD (maximum $100)</label>
-      <input id="amount" type="number" min="1" max="100" step="1" value="25" required>
-      <div id="buyStatus" class="status" role="status"></div>
-      <div class="row">
-        <button type="button" class="secondary" onclick="buyDialog.close()">Cancel</button>
-        <button id="submitBuy" type="submit">Confirm paper buy</button>
+  <!-- LEFT: Bots & Intelligence -->
+  <section class="col-span-3 flex flex-col gap-3 min-h-0">
+    <div class="card flex flex-col min-h-0 flex-1">
+      <div class="flex gap-4 px-4 pt-3 text-sm text-gray-500 border-b border-gray-800">
+        <button data-tab="bots" class="pb-2 tab-active">AI Bots</button>
+        <button data-tab="intel" class="pb-2">Market Intel</button>
       </div>
-    </form>
-  </dialog>
+      <div id="botsPanel" class="p-3 space-y-3 overflow-y-auto scroll"></div>
+      <div id="intelPanel" class="p-3 space-y-3 overflow-y-auto scroll hidden"></div>
+    </div>
+  </section>
 
-  <script>
-    // If the backend is hosted separately, replace "" with its base URL.
-    // Example: const API_BASE = "https://your-backend.example.com";
-    const API_BASE = "";
-    const symbols = ["BTC/USD", "ETH/USD", "SOL/USD"];
-    const names = { "BTC/USD": "Bitcoin", "ETH/USD": "Ethereum", "SOL/USD": "Solana" };
-    let selectedSymbol = "";
+  <!-- CENTER: Chart & Execution -->
+  <section class="col-span-6 flex flex-col gap-3 min-h-0">
+    <div class="card flex-1 flex flex-col min-h-0 p-3">
+      <div class="flex items-center justify-between mb-2">
+        <div>
+          <span class="font-semibold">BTC/USDT</span>
+          <span id="lastPrice" class="ml-3 text-lg font-bold">--</span>
+          <span id="chg" class="ml-2 text-xs"></span>
+        </div>
+        <div class="flex gap-2">
+          <button class="text-xs px-2 py-1 rounded bg-gray-800">1m</button>
+          <button class="text-xs px-2 py-1 rounded bg-[#3B82F6]/20 ai">1h</button>
+          <button class="text-xs px-2 py-1 rounded bg-gray-800">4h</button>
+        </div>
+      </div>
+      <svg id="chart" class="w-full flex-1 min-h-[220px]" preserveAspectRatio="none"></svg>
+    </div>
 
-    const markets = document.querySelector("#markets");
-    const pageStatus = document.querySelector("#pageStatus");
-    const buyDialog = document.querySelector("#buyDialog");
+    <div class="card p-3">
+      <div class="grid grid-cols-4 gap-2 mb-3">
+        <button id="buyBtn" class="py-2 rounded-lg bg-[#00E676]/20 gain font-semibold text-sm">BUY</button>
+        <button id="sellBtn" class="py-2 rounded-lg bg-[#FF5252]/10 loss font-semibold text-sm">SELL</button>
+        <select id="orderType" class="bg-[#0B0E14] border border-gray-800 rounded-lg text-sm px-2">
+          <option>Market</option><option>Limit</option>
+        </select>
+        <input id="amount" type="number" value="0.10" step="0.01" class="bg-[#0B0E14] border border-gray-800 rounded-lg text-sm px-2" placeholder="Qty">
+      </div>
+      <div class="grid grid-cols-3 gap-2 mb-3">
+        <input id="sl" type="number" placeholder="Stop Loss" class="bg-[#0B0E14] border border-gray-800 rounded-lg text-sm px-2 py-1.5">
+        <input id="tp" type="number" placeholder="Take Profit" class="bg-[#0B0E14] border border-gray-800 rounded-lg text-sm px-2 py-1.5">
+        <div class="text-xs">
+          <div class="flex justify-between text-gray-400"><span>Leverage</span><span id="levVal">1x</span></div>
+          <input id="lev" type="range" min="1" max="10" value="1" class="w-full accent-[#3B82F6]">
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button id="execBtn" class="flex-1 py-2 rounded-lg bg-[#3B82F6] text-white text-sm font-semibold flex items-center justify-center gap-2"><i data-lucide="zap" class="w-4 h-4"></i> Execute</button>
+        <button id="delegateBtn" class="flex-1 py-2 rounded-lg border border-[#3B82F6] ai text-sm font-semibold flex items-center justify-center gap-2"><i data-lucide="bot" class="w-4 h-4"></i> Delegate Trade to AI Agent</button>
+      </div>
+    </div>
+  </section>
 
-    function money(value) {
-      if (value == null || !Number.isFinite(Number(value))) return "—";
-      return Number(value).toLocaleString(undefined, {
-        style: "currency", currency: "USD", maximumFractionDigits: 4
-      });
-    }
+  <!-- RIGHT: AI Copilot -->
+  <section class="col-span-3 card flex flex-col min-h-0">
+    <div class="px-4 py-3 border-b border-gray-800 flex items-center gap-2 text-sm font-semibold">
+      <i data-lucide="sparkles" class="ai w-4 h-4"></i> ApexAI Copilot
+    </div>
+    <div class="px-3 py-2 flex flex-wrap gap-2 border-b border-gray-800">
+      <button class="chip">Analyze Current Chart</button>
+      <button class="chip">Backtest Strategy</button>
+      <button class="chip">Risk Exposure Check</button>
+      <button class="chip">Deploy Momentum Bot</button>
+    </div>
+    <div id="chat" class="flex-1 overflow-y-auto scroll p-3 space-y-3 text-sm"></div>
+    <div class="p-3 border-t border-gray-800 flex gap-2">
+      <input id="chatIn" placeholder="Ask ApexAI..." class="flex-1 bg-[#0B0E14] border border-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3B82F6]">
+      <button id="sendBtn" class="px-3 rounded-lg bg-[#3B82F6]"><i data-lucide="send" class="w-4 h-4"></i></button>
+    </div>
+  </section>
 
-    function renderCards(data) {
-      markets.innerHTML = symbols.map(symbol => {
-        const quote = data[symbol];
-        const bid = quote?.bid;
-        const ask = quote?.ask;
-        return `
-          <article class="coin">
-            <div class="row">
-              <div><strong>${names[symbol]}</strong><div class="symbol">${symbol}</div></div>
-              <span class="small">Live quote</span>
-            </div>
-            <div class="price">${money(ask)}</div>
-            <div class="small">Bid ${money(bid)} · Ask ${money(ask)}</div>
-            <div style="margin-top:16px">
-              <button onclick="openBuy('${symbol}')" ${ask == null ? "disabled" : ""}>Paper buy</button>
-            </div>
-          </article>`;
-      }).join("");
-    }
+  <!-- BOTTOM PANEL -->
+  <section class="col-span-12 card h-48 flex flex-col min-h-0">
+    <div class="flex gap-5 px-4 pt-2 text-xs text-gray-500 border-b border-gray-800 overflow-x-auto" id="bottomTabs">
+      <button class="pb-2 tab-active">Open Positions</button>
+      <button class="pb-2">Pending Orders</button>
+      <button class="pb-2">Closed Trades</button>
+      <button class="pb-2">Bot Execution Logs</button>
+      <button class="pb-2">Risk Audit</button>
+    </div>
+    <div id="bottomBody" class="flex-1 overflow-auto scroll p-3 text-xs"></div>
+  </section>
+</main>
 
-    async function loadPrices() {
-      const button = document.querySelector("#refreshButton");
-      button.disabled = true;
-      pageStatus.textContent = "";
-      try {
-        const response = await fetch(`${API_BASE}/api/prices`, { cache: "no-store" });
-        if (!response.ok) throw new Error(`Market request failed (${response.status})`);
-        const data = await response.json();
-        renderCards(data);
-        document.querySelector("#updated").textContent =
-          `Quotes refreshed ${new Date().toLocaleTimeString()}`;
-      } catch (error) {
-        pageStatus.className = "status error";
-        pageStatus.textContent = `${error.message}. Check that your backend is running.`;
-        renderCards({});
-      } finally {
-        button.disabled = false;
-      }
-    }
+<style>.chip{font-size:11px;padding:4px 8px;border-radius:999px;border:1px solid #3B82F6;color:#93C5FD;background:rgba(59,130,246,.08)}</style>
 
-    function openBuy(symbol) {
-      selectedSymbol = symbol;
-      document.querySelector("#buyTitle").textContent = `Paper buy ${symbol}`;
-      document.querySelector("#buyStatus").textContent = "";
-      buyDialog.showModal();
-    }
+<script>
+// ---------- Mock data ----------
+const bots = [
+  { name:"Alpha-Grid", strat:"Grid", status:"Active", pnl:184.22, symbol:"BTC/USDT" },
+  { name:"Arb-Scout", strat:"Arbitrage", status:"Idle", pnl:-42.10, symbol:"ETH/USDT" },
+  { name:"Mo-Rider", strat:"Momentum", status:"Active", pnl:97.55, symbol:"SOL/USDT" },
+];
+const intel = [
+  { src:"Sentiment", text:"BTC social sentiment turned bullish (+0.42)", tone:"gain" },
+  { src:"Macro", text:"USD index slipping ahead of CPI release", tone:"ai" },
+  { src:"Flow", text:"Large exchange outflows detected on ETH", tone:"gain" },
+  { src:"Risk", text:"Funding rate elevated on SOL perps", tone:"loss" },
+];
+const positions = [
+  { sym:"BTC/USDT", side:"LONG", qty:0.10, entry:64210, pnl:132.4 },
+  { sym:"SOL/USDT", side:"SHORT", qty:4.0, entry:162.1, pnl:-18.6 },
+];
+const bottomData = {
+  "Open Positions": () => table(["Symbol","Side","Qty","Entry","PnL"], positions.map(p=>[p.sym,p.side,p.qty,p.entry,pnlSpan(p.pnl)])),
+  "Pending Orders": () => table(["Symbol","Type","Side","Price"], [["ETH/USDT","Limit","BUY","3,120.00"]]),
+  "Closed Trades": () => table(["Symbol","Side","Result"], [["BTC/USDT","LONG",pnlSpan(88.2)],["AAPL","LONG",pnlSpan(-21.5)]]),
+  "Bot Execution Logs": () => table(["Time","Origin","Decision","Reason"], [[now(),"Alpha-Grid","HOLD","Price inside grid band"],[now(),"Mo-Rider","BUY","Breakout above 168.4"]]),
+  "Risk Audit": () => table(["Check","Status"], [["Exposure ≤ 2% per trade",pnlSpan(1)],["Stop-loss set on all positions","<span class='loss'>1 missing</span>"],["Leverage ≤ 5x","<span class='gain'>OK</span>"]]),
+};
 
-    document.querySelector("#buyForm").addEventListener("submit", async event => {
-      event.preventDefault();
-      const amount = Number(document.querySelector("#amount").value);
-      const status = document.querySelector("#buyStatus");
-      const button = document.querySelector("#submitBuy");
+function now(){ return new Date().toLocaleTimeString(); }
+function pnlSpan(v){ return `<span class="${v>=0?'gain':'loss'}">${v>=0?'+':''}${v.toFixed(2)}</span>`; }
+function table(head, rows){
+  return `<table class="w-full text-left"><thead class="text-gray-500"><tr>${head.map(h=>`<th class="py-1 pr-4 font-normal">${h}</th>`).join('')}</tr></thead>
+  <tbody>${rows.map(r=>`<tr class="border-t border-gray-800">${r.map(c=>`<td class="py-1 pr-4">${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
 
-      if (!Number.isFinite(amount) || amount < 1 || amount > 100) {
-        status.className = "status error";
-        status.textContent = "Enter an amount from $1 to $100.";
-        return;
-      }
+// ---------- Render bots & intel ----------
+function renderBots(){
+  document.getElementById('botsPanel').innerHTML = bots.map((b,i)=>`
+    <div class="border border-gray-800 rounded-xl p-3">
+      <div class="flex justify-between items-center">
+        <span class="font-semibold text-sm">${b.name}</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" class="sr-only peer" ${b.status==='Active'?'checked':''} onchange="toggleBot(${i}, this.checked)">
+          <div class="w-9 h-5 bg-gray-700 rounded-full peer-checked:bg-[#3B82F6] after:content-[''] after:absolute after:left-0.5 after:top-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></div>
+        </label>
+      </div>
+      <div class="flex justify-between text-xs mt-2 text-gray-400">
+        <span><span class="inline-block w-1.5 h-1.5 rounded-full mr-1 ${b.status==='Active'?'bg-[#00E676]':'bg-gray-500'}"></span>${b.status}</span>
+        <span>${b.strat} · ${b.symbol}</span>
+      </div>
+      <div class="text-xs mt-1">24h PnL: ${pnlSpan(b.pnl)}</div>
+    </div>`).join('');
+  document.getElementById('intelPanel').innerHTML = intel.map(n=>`
+    <div class="border border-gray-800 rounded-xl p-3 text-xs">
+      <div class="text-[10px] text-gray-500 uppercase">${n.src}</div>
+      <div class="mt-1 ${n.tone}">${n.text}</div>
+    </div>`).join('');
+}
+function toggleBot(i, on){ bots[i].status = on ? 'Active' : 'Idle'; renderBots(); addLog(`${bots[i].name} ${on?'enabled':'disabled'}`); }
 
-      button.disabled = true;
-      status.className = "status";
-      status.textContent = "Submitting paper order…";
+// ---------- Tabs ----------
+document.querySelectorAll('[data-tab]').forEach(btn=>btn.onclick=()=>{
+  document.querySelectorAll('[data-tab]').forEach(b=>b.classList.remove('tab-active'));
+  btn.classList.add('tab-active');
+  botsPanel.classList.toggle('hidden', btn.dataset.tab!=='bots');
+  intelPanel.classList.toggle('hidden', btn.dataset.tab!=='intel');
+});
+document.querySelectorAll('#bottomTabs button').forEach(btn=>btn.onclick=()=>{
+  document.querySelectorAll('#bottomTabs button').forEach(b=>b.classList.remove('tab-active'));
+  btn.classList.add('tab-active');
+  bottomBody.innerHTML = bottomData[btn.textContent]();
+});
 
-      try {
-        const response = await fetch(`${API_BASE}/api/paper-buy`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ symbol: selectedSymbol, amount_usd: amount })
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.detail || "Order failed");
+// ---------- Price feed (simulated WebSocket) ----------
+let candles = [];
+let price = 64250;
+function seedCandles(n=60){
+  candles = []; let p = price;
+  for(let i=0;i<n;i++){
+    const o=p, c=p*(1+(Math.random()-0.5)*0.01), h=Math.max(o,c)*(1+Math.random()*0.003), l=Math.min(o,c)*(1-Math.random()*0.003);
+    candles.push({o,h,l,c}); p=c;
+  }
+  price = p;
+}
+function tick(){
+  const last = candles[candles.length-1];
+  const c = price*(1+(Math.random()-0.5)*0.002); price = c;
+  last.c = c; last.h = Math.max(last.h,c); last.l = Math.min(last.l,c);
+  if(Math.random()<0.03){ candles.push({o:c,h:c,l:c,c}); candles.shift(); }
+  drawChart();
+  lastPrice.textContent = '$' + c.toLocaleString(undefined,{maximumFractionDigits:2});
+  const chgPct = ((c - candles[0].o)/candles[0].o)*100;
+  chg.textContent = (chgPct>=0?'+':'') + chgPct.toFixed(2)+'%';
+  chg.className = 'ml-2 text-xs ' + (chgPct>=0?'gain':'loss');
+  netWorth.textContent = '$' + (12450 + positions.reduce((s,p)=>s+p.pnl,0)).toLocaleString(undefined,{minimumFractionDigits:2});
+}
+function drawChart(){
+  const svg = document.getElementById('chart');
+  const W=800,H=300, pad=10;
+  const hi=Math.max(...candles.map(c=>c.h)), lo=Math.min(...candles.map(c=>c.l));
+  const y = v => pad + (hi-v)/(hi-lo)*(H-2*pad);
+  const cw = (W-2*pad)/candles.length;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  svg.innerHTML = candles.map((c,i)=>{
+    const up=c.c>=c.o, col=up?'#00E676':'#FF5252', x=pad+i*cw+cw/2;
+    return `<line x1="${x}" x2="${x}" y1="${y(c.h)}" y2="${y(c.l)}" stroke="${col}" stroke-width="1"/>
+            <rect x="${x-cw*0.35}" y="${Math.min(y(c.o),y(c.c))}" width="${cw*0.7}" height="${Math.max(1,Math.abs(y(c.o)-y(c.c)))}" fill="${col}"/>`;
+  }).join('');
+}
 
-        status.className = "status success";
-        status.textContent = `Paper order submitted. Status: ${result.status}`;
-        setTimeout(() => buyDialog.close(), 1400);
-      } catch (error) {
-        status.className = "status error";
-        status.textContent = `${error.message}.`;
-      } finally {
-        button.disabled = false;
-      }
-    });
+// ---------- Trading ----------
+function executeTrade(side){
+  const qty=amount.value, type=orderType.value;
+  addLog(`${side} ${qty} BTC/USDT (${type}) · SL ${sl.value||'—'} · TP ${tp.value||'—'} · ${lev.value}x`, 'manual');
+  if(!sl.value) addChat('ai', `Warning: no stop-loss set. Risk audit flagged this order. Manage leverage responsibly.`);
+  addChat('tradeCard', {side, qty, type, price: price.toFixed(2)});
+}
+buyBtn.onclick = ()=>executeTrade('BUY');
+sellBtn.onclick = ()=>executeTrade('SELL');
+execBtn.onclick = ()=>executeTrade(orderType.value==='Limit'?'LIMIT':'BUY');
+delegateBtn.onclick = ()=>{
+  addLog('Trade delegated to Agent-Alpha (pending pre-trade checklist)','agent');
+  addChat('ai','Trade delegated to Agent-Alpha. It will check exposure (max 2% per trade), free margin, and that a stop-loss is set before placing anything.');
+};
+lev.oninput = ()=> levVal.textContent = lev.value+'x';
 
-    function showProposal(agent) {
-      alert(`${agent}: Sample only — no AI analysis or trade execution is connected yet.`);
-    }
+// ---------- Logs ----------
+const logs = [];
+function addLog(msg, origin='system'){ logs.unshift(`[${now()}] ${origin.toUpperCase()}: ${msg}`); if(bottomTabs.children[3].classList.contains('tab-active')) bottomBody.innerHTML = bottomData['Bot Execution Logs'](); }
 
-    loadPrices();
-    setInterval(loadPrices, 30000);
-  </script>
+// ---------- Chat ----------
+function addChat(role, content){
+  const el = document.createElement('div');
+  if(role==='user'){
+    el.className='ml-8 bg-[#1F2937] rounded-xl px-3 py-2';
+    el.textContent=content;
+  } else if(role==='tradeCard'){
+    el.className='border border-[#3B82F6]/50 rounded-xl p-3 bg-[#3B82F6]/5';
+    el.innerHTML=`<div class="text-xs ai mb-1">TRADE PREVIEW</div>
+      <div class="font-semibold ${content.side==='BUY'?'gain':'loss'}">${content.side} ${content.qty} BTC/USDT</div>
+      <div class="text-xs text-gray-400">${content.type} @ ${content.price}</div>
+      <div class="flex gap-2 mt-2"><button class="flex-1 py-1 rounded bg-[#3B82F6] text-xs">Confirm</button><button class="flex-1 py-1 rounded border border-gray-700 text-xs">Cancel</button></div>`;
+  } else {
+    el.className='mr-6 space-y-2';
+    el.innerHTML = marked_lite(content);
+  }
+  chat.appendChild(el); chat.scrollTop = chat.scrollHeight;
+}
+function marked_lite(t){
+  return `<div class="bg-[#111620] border border-gray-800 rounded-xl px-3 py-2 whitespace-pre-wrap">${t.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')}</div>`;
+}
+const ANALYSIS = `**Market Structure:** Bullish (higher highs on 1h)
+**Key Levels:** Support 63,800 · Resistance 65,400 · Liquidity 66,100
+**AI Conviction Score:** 68%
+**Suggested Setup:** Entry 64,250 · SL 63,600 · TP 65,540 (1:2 R/R)
+Risk disclosure: Not financial advice. Trade with small size, use low leverage, and automated bots can lose money quickly.`;
+const RESPONSES = {
+  'Analyze Current Chart': ANALYSIS,
+  'Backtest Strategy': 'Backtest queued for Momentum (EMA 9/21, 1h, BTC/USDT, last 180 days). Results will appear in Risk Audit when complete.',
+  'Risk Exposure Check': 'Total exposure: 2 open positions. Largest single-trade risk is within your 2% limit, but 1 position has no stop-loss.',
+  'Deploy Momentum Bot': '```json\n{ "action": "CREATE\_BOT", "symbol": "BTC/USDT", "strategy": "Momentum", "interval": "1h", "stop\_loss\_percentage": 3.0 }\n```\nBefore deployment, confirm the parameters. Automated execution carries a risk of loss.'
+};
+function ask(q){
+  addChat('user', q);
+  setTimeout(()=>addChat('ai', RESPONSES[q] || 'Got it. Analysis for "'+q+'" is not connected to a live data source in this demo.'), 350);
+}
+document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>ask(c.textContent.trim()));
+sendBtn.onclick = ()=>{ const v=chatIn.value.trim(); if(v){ ask(v); chatIn.value=''; } };
+chatIn.onkeydown = e=>{ if(e.key==='Enter') sendBtn.click(); };
+
+// ---------- Init ----------
+seedCandles();
+renderBots();
+bottomBody.innerHTML = bottomData["Open Positions"]();
+addChat('ai', 'Hi, I am ApexAI. Choose a quick action or ask about any symbol.');
+setInterval(tick, 1000);
+tick();
+lucide.createIcons();
+</script>
 </body>
 </html>
