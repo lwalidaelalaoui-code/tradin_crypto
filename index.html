@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orbit — Paper Trading</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1020;
+      --panel: #131b2e;
+      --muted: #93a0b8;
+      --text: #edf2ff;
+      --accent: #7c6cff;
+      --green: #35d39a;
+      --border: #26324b;
+      --red: #ff8585;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.5 system-ui, sans-serif;
+    }
+    header, main { max-width: 1100px; margin: auto; padding: 24px; }
+    header { display: flex; justify-content: space-between; align-items: center; }
+    .brand { font-size: 21px; font-weight: 750; }
+    .brand span { color: var(--accent); }
+    .badge { color: #ffd17a; font-size: 12px; }
+    h1 { font-size: clamp(30px, 5vw, 48px); margin: 30px 0 8px; }
+    p, .muted { color: var(--muted); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+    .panel, .coin { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
+    .section-title { margin: 32px 0 14px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .symbol, .small { color: var(--muted); font-size: 13px; }
+    .price { font-size: 20px; font-weight: 700; margin-top: 18px; }
+    button {
+      border: 0; border-radius: 10px; padding: 10px 14px;
+      color: white; background: var(--accent); font-weight: 650; cursor: pointer;
+    }
+    button:disabled { opacity: .55; cursor: wait; }
+    button.secondary { background: #303b52; }
+    .status { min-height: 24px; margin: 12px 0; }
+    .error { color: var(--red); }
+    .success { color: var(--green); }
+    .notice { margin-top: 24px; padding: 14px; border-radius: 12px; background: #211d16; color: #f0cd8d; }
+    dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 16px; padding: 24px; width: min(420px, calc(100% - 32px)); }
+    dialog::backdrop { background: #000a; }
+    input { width: 100%; padding: 12px; margin: 8px 0 16px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; }
+    label { display: block; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">orbit<span>.</span></div>
+    <div class="badge">PAPER TRADING · No real funds</div>
+  </header>
+
+  <main>
+    <p class="muted">Live market quotes · Simulated orders</p>
+    <h1>Trading dashboard</h1>
+    <div class="row">
+      <span id="updated" class="small">Loading market data…</span>
+      <button id="refreshButton" class="secondary" onclick="loadPrices()">Refresh</button>
+    </div>
+    <div id="pageStatus" class="status" role="status"></div>
+
+    <h2 class="section-title">AI agent proposals</h2>
+    <section class="grid">
+      <article class="panel">
+        <strong>Trend Scout</strong>
+        <p>Reviews recent market movement and suggests a direction for your consideration.</p>
+        <button onclick="showProposal('Trend Scout')">View sample proposal</button>
+      </article>
+      <article class="panel">
+        <strong>Risk Monitor</strong>
+        <p>Reminder to review order size and risk before placing a paper order.</p>
+        <button class="secondary" onclick="alert('Risk check: confirm the coin, order amount, and paper-trading mode.')">Review checklist</button>
+      </article>
+    </section>
+
+    <h2 class="section-title">Crypto markets</h2>
+    <section class="grid" id="markets"></section>
+
+    <div class="notice">
+      Orders are sent to your backend’s paper-trading endpoint. Quotes require a running backend.
+      Agent proposals are informational and do not automatically trade.
+    </div>
+  </main>
+
+  <dialog id="buyDialog">
+    <form id="buyForm">
+      <h2 id="buyTitle">Paper buy</h2>
+      <p class="muted">This submits a simulated order, not a real-money trade.</p>
+      <label for="amount">Amount in USD (maximum $100)</label>
+      <input id="amount" type="number" min="1" max="100" step="1" value="25" required>
+      <div id="buyStatus" class="status" role="status"></div>
+      <div class="row">
+        <button type="button" class="secondary" onclick="buyDialog.close()">Cancel</button>
+        <button id="submitBuy" type="submit">Confirm paper buy</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    // If the backend is hosted separately, replace "" with its base URL.
+    // Example: const API_BASE = "https://your-backend.example.com";
+    const API_BASE = "";
+    const symbols = ["BTC/USD", "ETH/USD", "SOL/USD"];
+    const names = { "BTC/USD": "Bitcoin", "ETH/USD": "Ethereum", "SOL/USD": "Solana" };
+    let selectedSymbol = "";
+
+    const markets = document.querySelector("#markets");
+    const pageStatus = document.querySelector("#pageStatus");
+    const buyDialog = document.querySelector("#buyDialog");
+
+    function money(value) {
+      if (value == null || !Number.isFinite(Number(value))) return "—";
+      return Number(value).toLocaleString(undefined, {
+        style: "currency", currency: "USD", maximumFractionDigits: 4
+      });
+    }
+
+    function renderCards(data) {
+      markets.innerHTML = symbols.map(symbol => {
+        const quote = data[symbol];
+        const bid = quote?.bid;
+        const ask = quote?.ask;
+        return `
+          <article class="coin">
+            <div class="row">
+              <div><strong>${names[symbol]}</strong><div class="symbol">${symbol}</div></div>
+              <span class="small">Live quote</span>
+            </div>
+            <div class="price">${money(ask)}</div>
+            <div class="small">Bid ${money(bid)} · Ask ${money(ask)}</div>
+            <div style="margin-top:16px">
+              <button onclick="openBuy('${symbol}')" ${ask == null ? "disabled" : ""}>Paper buy</button>
+            </div>
+          </article>`;
+      }).join("");
+    }
+
+    async function loadPrices() {
+      const button = document.querySelector("#refreshButton");
+      button.disabled = true;
+      pageStatus.textContent = "";
+      try {
+        const response = await fetch(`${API_BASE}/api/prices`, { cache: "no-store" });
+        if (!response.ok) throw new Error(`Market request failed (${response.status})`);
+        const data = await response.json();
+        renderCards(data);
+        document.querySelector("#updated").textContent =
+          `Quotes refreshed ${new Date().toLocaleTimeString()}`;
+      } catch (error) {
+        pageStatus.className = "status error";
+        pageStatus.textContent = `${error.message}. Check that your backend is running.`;
+        renderCards({});
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function openBuy(symbol) {
+      selectedSymbol = symbol;
+      document.querySelector("#buyTitle").textContent = `Paper buy ${symbol}`;
+      document.querySelector("#buyStatus").textContent = "";
+      buyDialog.showModal();
+    }
+
+    document.querySelector("#buyForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const amount = Number(document.querySelector("#amount").value);
+      const status = document.querySelector("#buyStatus");
+      const button = document.querySelector("#submitBuy");
+
+      if (!Number.isFinite(amount) || amount < 1 || amount > 100) {
+        status.className = "status error";
+        status.textContent = "Enter an amount from $1 to $100.";
+        return;
+      }
+
+      button.disabled = true;
+      status.className = "status";
+      status.textContent = "Submitting paper order…";
+
+      try {
+        const response = await fetch(`${API_BASE}/api/paper-buy`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbol: selectedSymbol, amount_usd: amount })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Order failed");
+
+        status.className = "status success";
+        status.textContent = `Paper order submitted. Status: ${result.status}`;
+        setTimeout(() => buyDialog.close(), 1400);
+      } catch (error) {
+        status.className = "status error";
+        status.textContent = `${error.message}.`;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    function showProposal(agent) {
+      alert(`${agent}: Sample only — no AI analysis or trade execution is connected yet.`);
+    }
+
+    loadPrices();
+    setInterval(loadPrices, 30000);
+  </script>
+</body>
+</html>
